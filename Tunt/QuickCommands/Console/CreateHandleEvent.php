@@ -213,4 +213,3 @@ class '.$class.' implements ObserverInterface
         return $content;
     }
 }
-
