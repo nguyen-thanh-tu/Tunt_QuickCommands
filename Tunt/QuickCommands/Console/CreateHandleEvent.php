@@ -13,6 +13,7 @@ class CreateHandleEvent extends Command
     const EVENT_NAME = 'eventname';
     const OBSERVER_NAME = 'observername';
     const INSTANCE = 'instance';
+    const AREA = 'area';
 
     protected $dir;
     protected $module = '';
@@ -38,6 +39,12 @@ class CreateHandleEvent extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Module'
+            ),
+            new InputOption(
+                self::AREA,
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Area'
             ),
             new InputOption(
                 self::EVENT_NAME,
@@ -74,13 +81,21 @@ class CreateHandleEvent extends Command
             ($this->observername = $input->getOption(self::OBSERVER_NAME)) &&
             ($this->instance = $input->getOption(self::INSTANCE))
         ) {
+            $pathAppCode = $this->dir->getPath('app').'/code';
+            $area = $input->getOption(self::AREA).'/';
             $moduleName = str_replace('_','/',$this->module);
-            $this->generatedModuleXML('/var/www/testmagento2/app/code/'.$moduleName);
+            $pathEtc = $pathAppCode.'/'.$moduleName.'/etc/';
+            if(empty(is_dir($pathEtc.$input->getOption(self::AREA))))
+            {
+                mkdir($pathEtc.$input->getOption(self::AREA));
+            }
+            $this->generatedModuleXML($pathEtc.$area.'events.xml');
+            $this->generatedObserverPHP($pathAppCode);
         }
         return $this;
     }
 
-    public function generatedModuleXML($paths)
+    public function generatedModuleXML($path)
     {
         $xml = <<<XML
     <event name="%s">
@@ -88,9 +103,9 @@ class CreateHandleEvent extends Command
     </event>\n
 XML;
         $xmlSnippet = sprintf($xml, $this->eventname, $this->observername, $this->instance);
-        if(empty(is_file($paths.'/etc/events.xml')))
+        if(empty(is_file($path)))
         {
-            $registrationFile = fopen($paths.'/etc/events.xml', 'w');
+            $registrationFile = fopen($path, 'w');
             fwrite($registrationFile, '<?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
 '.$xmlSnippet.'</config>');
@@ -98,20 +113,44 @@ XML;
 
             return $this;
         }
-        $file = simplexml_load_file($paths.'/etc/events.xml');
+        $file = simplexml_load_file($path);
         $events = (array)$file;
+        $eventss = (array)$events['event'];
+        if(!empty($eventss['@attributes']) || !empty($eventss['observer']))
+        {
+            $events = [];
+            $events[0] =
+                [
+                    '@attributes' => $eventss['@attributes'],
+                    'observer' => $eventss['observer']
+                ];
+        }else{
+            $events = $eventss;
+        }
         $nodeAdd = null;
-        foreach($events['event'] as $key => $event)
+        foreach($events as $key => $event)
         {
             $event = (array)$event;
             if($event['@attributes']['name'] == $this->eventname)
             {
-                $observer = (array)$event['observer'];
-                if($observer['@attributes']['name'] == $this->observername || $observer['@attributes']['instance'] == $this->instance)
+                $observerss = (array)$event['observer'];
+                if(!empty($observerss['@attributes']))
                 {
-                    return $this;
+                    $observers = [];
+                    $observers[0] = [
+                        '@attributes' => $observerss['@attributes']
+                    ];
+                }else{
+                    $observers = $observerss;
                 }
-                $nodeAdd = $key;
+                foreach($observers as $observer){
+                    $observer = (array)$observer;
+                    if($observer['@attributes']['name'] == $this->observername || $observer['@attributes']['instance'] == $this->instance)
+                    {
+                        return $this;
+                    }
+                }
+                $nodeAdd = (int)$key;
                 $xmlSnippet = '    <observer name="'.$this->observername.'" instance="'.$this->instance.'"/>
     ';
                 break;
@@ -127,8 +166,51 @@ XML;
         }else{
             $dom->documentElement->appendChild($fragment);
         }
-        $dom->save($paths.'/etc/events.xml');
+        $dom->save($path);
 
         return $this;
     }
+
+    public function generatedObserverPHP($paths)
+    {
+        $folders = explode('\\',$this->instance);
+        $namespace = '';
+        foreach($folders as $key => $folder)
+        {
+            $paths .= '/'.$folder;
+            if(empty(is_file($paths)) && $key == (count($folders) - 1))
+            {
+                $namespace = rtrim($namespace,'\\');
+                $class = $folder;
+                $registrationFile = fopen($paths.'.php', 'w');
+                fwrite($registrationFile, $this->getContentObserverPHP($namespace,$class));
+                fclose($registrationFile);
+                break;
+            }elseif(empty(is_dir($paths)))
+            {
+                mkdir($paths);
+            }
+            $namespace .= $folder.'\\';
+        }
+    }
+
+    public function getContentObserverPHP($namespace,$class)
+    {
+        $content = '<?php
+
+namespace '.$namespace.';
+
+use Magento\Framework\Event\Observer;
+use Magento\Framework\Event\ObserverInterface;
+
+class '.$class.' implements ObserverInterface
+{
+    public function execute(Observer $observer)
+    {
+
+    }
+}';
+        return $content;
+    }
 }
+
