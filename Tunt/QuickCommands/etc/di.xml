@@ -7,6 +7,7 @@
                 <item name="createModule" xsi:type="object">Tunt\QuickCommands\Console\CreateModule</item>
                 <item name="createController" xsi:type="object">Tunt\QuickCommands\Console\CreateController</item>
                 <item name="createHandleEvent" xsi:type="object">Tunt\QuickCommands\Console\CreateHandleEvent</item>
+                <item name="createPlugin" xsi:type="object">Tunt\QuickCommands\Console\CreatePlugin</item>
             </argument>
         </arguments>
     </type>
