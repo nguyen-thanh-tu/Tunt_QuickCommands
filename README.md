@@ -11,8 +11,8 @@ bin/magento commands:delete:generated
 
 3: Create Controller 
 
-bin/magentp commands:create:controller --module="Your_Module" --controller="Your\Module\Controller\ControllerName\ActionName"
+bin/magento commands:create:controller --module="Your_Module" --controller="Your\Module\Controller\ControllerName\ActionName"
 
 4 Create Observer
 
-bin/magentp commands:create:handleevent --module="Your_Module" --eventname"eventname_to_catch" --observername="your_observername" --instance="Your\Module\Observer\Event"
+bin/magento commands:create:handleevent --module="Your_Module" --eventname"eventname_to_catch" --observername="your_observername" --instance="Your\Module\Observer\Event"
